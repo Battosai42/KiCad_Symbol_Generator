@@ -1,10 +1,11 @@
 # KiCad_Symbol_Generator
 
-This script is intended to read a file containing a verilog style pinlist and automatically generate a Kicad compatible symbol from it. 
+This script is intended to read a file containing a pinlist and automatically generate a Kicad compatible symbol from it. 
 
 ## Task List
 - [x] basic symbol generation
 - [x] reading of basic input file (see example)
+- [ ] open documents spreadsheat (ods) as input
 - [ ] verilog file as input
 - [ ] spice file as input
 
