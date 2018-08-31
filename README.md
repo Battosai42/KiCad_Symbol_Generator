@@ -16,4 +16,4 @@ output [15:0] decoder_out ;
 inout [15:0] decoder_out ;
 ```
 
-Currently tested on KiCad 5.0
+*Currently tested on KiCad 5.0*
