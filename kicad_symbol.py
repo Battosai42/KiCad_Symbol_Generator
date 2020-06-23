@@ -30,6 +30,17 @@ class KiCadPin:
     KiCadPin implements a basic pin class adhering to the KiCad symbol file definitions
     """
     logger = logging.getLogger(__name__)
+    _name = ''
+    _number = None
+    _pos = [0, 0]
+    _length = None
+    _orientation = None
+    _snum = None
+    _snom = None
+    _unit = None
+    _convert = None
+    _etype = None
+    _shape = None
 
     def __init__(self, name='default', number=0, posx=0, posy=0, length=100, orientation='L', snum=50,
                snom=50, unit=0, convert=1, etype='I', shape=''):
@@ -68,25 +79,38 @@ class KiCadPin:
         self._shape = shape
         self.logger.info(' Created Pin: {}'.format(self.getPin()))
 
-    def setPinAuto(self, param=[]):
+    def updatePin(self, param='', value=None):
         """
-        Auto Pin generation (used for reading symbols)
+        Get pin parameter(s)
 
-        :param param: [name, number, posx, posy, length, orientation, snum, snom, unit, convert, etype, shape]
+        :param param: "name, number, posx, posy, length, orientation, snum, snom, unit, convert, etype, shape"
         :return:
         """
-        self._name = param[0]
-        self._number = param[1]
-        self._pos = [param[2], param[3]]
-        self._length = param[4]
-        self._orientation = param[5]
-        self._snum = param[6]
-        self._snom = param[7]
-        self._unit = param[8]
-        self._convert = param[9]
-        self._etype = param[10]
-        self._shape = param[11]
-        self.logger.info(' Created Pin: {}'.format(self.getPin()))
+        if param.lower() == 'name':
+            self._name = value
+        elif param.lower() == 'number':
+            self._number = value
+        elif param.lower() == 'posx':
+            self._pos[0] = value
+        elif param.lower() == 'posy':
+            self._pos[1] = value
+        elif param.lower() == 'length':
+            self._length = value
+        elif param.lower() == 'orientation':
+            self._orientation = value
+        elif param.lower() == 'snum':
+            self._snum = value
+        elif param.lower() == 'snom':
+            self._snom = value
+        elif param.lower() == 'unit':
+            self._unit = value
+        elif param.lower() == 'convert':
+            self._convert = value
+        elif param.lower() == 'etype':
+            self._etype = value
+        elif param.lower() == 'shape':
+            self._shape = value
+        self.logger.info('updated parameter "{}"= {}'.format(param, value))
 
     def getPin(self, param=''):
         """
@@ -127,7 +151,7 @@ class KiCadPin:
             return pin
 
 
-class KiCadSymbol(KiCadPin):
+class KiCadSymbol():
     logger = logging.getLogger(__name__)
 
     def __init__(self, name='default'):
@@ -278,6 +302,7 @@ class KiCadSymbol(KiCadPin):
         """
         Format : P Nb parts convert thickness x0 y0 x1 y1 xi yi cc
 
+        :param Nb: Number of points
         :param parts: 0 if common to the parts; if not, number of part (1. .n).
         :param convert: 0 if common to the 2 representations, if not 1 or 2.
         :param thickness: line thickness.
@@ -289,7 +314,7 @@ class KiCadSymbol(KiCadPin):
         coordinates = ''
         for i in range(len(x)):
             coordinates = '{} {} {}'.format(coordinates, x[i], y[i])
-        poly = 'P {} {} {} {} {} {}'.format(len(x), parts, convert, thickness, coordinates, cc)
+        poly = 'P {} {} {} {}{} {}'.format(len(x), parts, convert, thickness, coordinates, cc)
         self.logger.info(' Created Polygon: {}'.format(poly))
         self.geometry.append(poly)
 
@@ -336,7 +361,8 @@ class KiCadSymbol(KiCadPin):
         self.logger.info(' Created Arc: {}'.format(arc))
         self.geometry.append(arc)
 
-    def writeSymbol(self, path=None, library=None, mode='a'):
+    # Symbol operations
+    def writeSymbol(self, library=None, mode='a'):
         """
 
         :param path: file path to library location
@@ -348,7 +374,7 @@ class KiCadSymbol(KiCadPin):
         :return:
         """
         try:
-            symbol = open(file='{}/{}'.format(path, library), mode=mode)
+            symbol = open(file=library, mode=mode)
             symbol.write(self.header)
             symbol.write('\n')
             for line in self.component:
@@ -363,18 +389,18 @@ class KiCadSymbol(KiCadPin):
                 symbol.write('\n')
             symbol.write('$ENDFPLIST\n')
             symbol.write('DRAW\n')
-            for line in self.pins:
-                symbol.write(line.getPin())
-                symbol.write('\n')
             for line in self.geometry:
                 symbol.write(line)
                 symbol.write('\n')
+            for line in self.pins:
+                symbol.write(line.getPin())
+                symbol.write('\n')
             symbol.write('ENDDRAW\n')
             symbol.write('ENDDEF\n')
-            self.logger.info('Finished writing symbol to library')
+            self.logger.info(' Finished writing symbol to library')
             symbol.close()
         except Exception as e:
-            print('Could not write to symbol to library: {}'.format(e))
+            print(' Could not write to symbol to library: {}'.format(e))
 
     def readSymbol(self, library=None, component=None):
         """
@@ -396,7 +422,7 @@ class KiCadSymbol(KiCadPin):
                     self.createComponent(name=comp[1], reference=comp[2], unused=comp[3], text_offset=comp[4],
                                           draw_pinnumber=comp[5], draw_pinname=comp[6], unit_count=comp[7],
                                           units_locked=comp[8], option_flag=comp[9])
-                    self.logger.info('Comonent found!')
+                    self.logger.info(' Component found: {}'.format(self.name))
                 elif line[0].upper() == 'F':
                     field = line.rstrip()[1:].split(' ')
                     self.createFields(n=field[0], text=field[1], posx=field[2], posy=field[3], dimension=field[4],
@@ -406,20 +432,20 @@ class KiCadSymbol(KiCadPin):
                     self.alias = line
                 elif line[0] == ' ':
                     self.createFootprint(footprint=line.rstrip())
-                elif line[0].upper() == 'P': #['P, S, C, A']:
-                    poly = line.upper().rstrip()[1:].split(' ')
+                elif line[0].upper() == 'P':
+                    poly = line.rstrip()[2:].split(' ')
                     x=[]
                     y=[]
-                    for i in range(3, len(poly)-1, 2):
+                    for i in range(4, len(poly)-1, 2):
                         x.append(poly[i])
                         y.append(poly[i+1])
-                    self.createPolygon(parts=poly[0], convert=poly[1], thickness=poly[2], x=x, y=y, cc=poly[-1])
+                    self.createPolygon(parts=poly[1], convert=poly[2], thickness=poly[3], x=x, y=y, cc=poly[-1])
                 elif line[0].upper() == 'S':
                     rect = line.upper().rstrip()[1:].split(' ')
                     self.createRectangle(startx=rect[0], starty=rect[1], endx=rect[2], endy=rect[3], unit=rect[4],
                                          convert=rect[5], thickness=rect[6], cc=rect[7])
                 elif line[0].upper() == 'C':
-                    cir = line.upper().rstrip()[1:].split(' ')
+                    cir = line.upper().rstrip()[2:].split(' ')
                     self.createCircle(posx=cir[0], posy=cir[1], radius=cir[2], unit=cir[3], convert=cir[4],
                                       thickness=cir[5], cc=cir[6])
                 elif line[0].upper() == 'A':
@@ -444,6 +470,62 @@ class KiCadSymbol(KiCadPin):
             print('Reading symbol failed: {}'.format(e))
 
 
+class SymbolTools:
+    """
+    This class contains helper tools to manipulate already existing symbols. Currently the following are implemented:
+
+        Tools:
+        - compareSymbols: compare and and fix differences in two symbols
+    """
+    logger = logging.getLogger(__name__)
+
+    def __init__(self):
+        self.logger.info('Symbol Tools')
+
+    def compareSymbols(self, libraryA=None, libraryB=None, componentA=None, componentB=None, param='number', fix=None):
+        """
+        Compare two symbols with each other
+
+        :param libraryA: full path to library
+        :param libraryB: full path to library (equal to libraryA A if omitted)
+        :param componentA: name of component A
+        :param componentB: name of component A (equal to componentA if omitted)
+        :param param: [name, number, posx, posy, length, orientation, snum, snom, unit, convert, etype, shape]
+        :param fix: if True the script will fix the component in libraryB
+        :return:
+        """
+        if componentB == None:
+            componentB = componentA
+        if libraryB == None:
+            libraryB = libraryA
+
+        error = False
+        symbolA = KiCadSymbol()
+        symbolB = KiCadSymbol()
+        symbolA.readSymbol(library=libraryA, component=componentA)
+        symbolB.readSymbol(library=libraryB, component=componentB)
+
+        pins = range(len(symbolA.pins))
+
+        for i in pins:
+            name = symbolA.pins[i].getPin(param='name')
+            for i in pins:
+                if name == symbolB.pins[i].getPin(param='name'):
+                    nA = symbolA.pins[i].getPin(param=param)
+                    nB = symbolB.pins[i].getPin(param=param)
+                    if nA != nB:
+                        print('Mismatch Found! Pad: {}, pin Number {} vs {}'.format(name, nA, nB))
+                        if fix is True:
+                            error = True
+                            symbolB.pins[i].updatePin(param='number', value=nA)
+                            print('fixed pad {}: {}'.format(param, symbolB.pins[i].getPin(param=param)))
+                        break
+
+        if fix is True and error is True:
+            symbolB.writeSymbol(library=libraryB, mode='w')
+            print('saved fixed library to {}'.format(libraryB))
+
+
 def example():
     import logging
     logging.basicConfig(level=logging.DEBUG)
@@ -457,7 +539,6 @@ def example():
     sym.createArc()
     sym.createComponent()
 
-
 def exampleRead():
     import logging
     logging.basicConfig(level=logging.DEBUG)
@@ -468,7 +549,7 @@ def exampleRead():
     sym.readSymbol(library=library, component=component)
     print(sym.pins[1].getPin())
 
-    sym.writeSymbol(path='C:/Users/Battosai\Downloads', library='test.lib', mode='w')
+    sym.writeSymbol(path='C:/Users/Battosai/Downloads', library='test.lib', mode='w')
 
 def examplepin():
     import logging
@@ -480,5 +561,13 @@ def examplepin():
     pin2 = KiCadPin(test)
     print(pin2.getPin())
 
+def compareSym():
+    library = 'C:/Program Files/KiCad/share/kicad/library/Amplifier_Operational.lib'
+    library2 = 'C:/Users/Battosai/Downloads/test.lib'
+    component = 'AD8015'
+
+    tool = SymbolTools()
+    tool.compareSymbols(libraryA=library, libraryB=library2, componentA=component, fix=True)
+
 if __name__ == "__main__":
-    exampleRead()
+    compareSym()
